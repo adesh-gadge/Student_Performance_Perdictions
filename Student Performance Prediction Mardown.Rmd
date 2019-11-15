@@ -1,0 +1,324 @@
+---
+title: 'Student_Performance_Predictions using Ordinal Regression, ANN and Random Forest'
+author: 'Adesh Gadge'
+date: "29 April 2019"
+output:
+  word_document: default
+  pdf_document: default
+  html_document: default
+---
+
+
+***
+#**Section 1: Data preparation **
+***
+***
+##**Dependencies**
+***
+####loading required libraries
+```{r,message=F, warning=F}
+library(caret)
+library(rpart)
+library(keras)
+library(MASS)
+library(recipes)
+library(MLmetrics)
+```
+***
+##**Data**
+***
+####Having look at the data
+```{r}
+df <- read.csv("data.csv")
+#head(df)
+sum(!complete.cases(df))
+str(df)
+```
+
+***
+#**Section 2: Oridinal Logistic Regression **
+***
+***
+##**Data Preprocessing**
+***
+##### Here we set the order of the class variable and also scale numeric independent variable and split data into training and testing dataframes.
+```{r}
+df$Class <- factor(df$Class, levels=c("L","M","H"), ordered=TRUE)
+df$raisedhands <- scale(df$raisedhands, center = TRUE, scale = TRUE)
+df$VisITedResources  <- scale(df$VisITedResources , center = TRUE, scale = TRUE)
+df$AnnouncementsView  <- scale(df$AnnouncementsView , center = TRUE, scale = TRUE)
+df$Discussion  <- scale(df$Discussion , center = TRUE, scale = TRUE)
+trainingRows <- sample(1:nrow(df), 0.7 * nrow(df))
+training_df <- df[trainingRows, ]
+testing_df<-df[-trainingRows,]
+test_df <- df[-trainingRows,1:length(df)-1 ]
+
+```
+***
+##**Model Building**
+***
+##### Now, building the ordinal logistic regression and observing the summary of the model.
+```{r, warning=FALSE,message= FALSE}
+start_OLR <-Sys.time()
+options(contrasts = c("contr.treatment", "contr.poly"))
+polrMod <- polr(Class ~ ., data=training_df,Hess= TRUE)
+print(Sys.time() - start_OLR)
+summary(polrMod)
+
+```
+***
+##**Model Interpretations**
+***
+#### The categorical variables like TopicEnglish can be interpreted as: a student with topic Eng, as opposed to a base Topic student, is associated with a higher likelihood of having a higher performance. The t-value is greater than 2 and therefore is statistically significant at the 5% level
+
+#### The continuous variables like raised hands can be interpreted as : with one unit increase in raisedhands the log of odds of having a higher student performance increases by  0.73924
+
+#### Intercepts:
+####L|M: Log of odds of having student performance 'Low' versus having student performance 'Medium' or 'High' = 2.5881
+####M|H: Log of odds of having student performance 'Medium' versus having student performance  'High' = 9.1711
+
+
+***
+#**Section 3: Artificial Neural Network **
+***
+***
+##**Data Preprocessing**
+***
+#####
+```{r}
+rec_obj <- recipe(Class ~ ., data =df) %>% 
+     # step_discretize(tenure, options = list(cuts = 6)) %>% 
+      #step_log(TotalCharges) %>% 
+      step_dummy(all_nominal(), -all_outcomes()) %>% 
+      step_center(all_predictors(), -all_outcomes()) %>% 
+      step_scale(all_predictors(), -all_outcomes()) %>% 
+      prep(data = df)
+
+```
+
+#####
+
+```{r,warning=FALSE}
+x_train_tbl <- bake(rec_obj, newdata = training_df)
+x_test_tbl <- bake(rec_obj, newdata = testing_df) 
+y_train <- as.numeric(unlist(x_train_tbl[,5])) -1
+y_test <- as.numeric(unlist(x_test_tbl[,5])) -1
+x_train_tbl <-x_train_tbl[,-5]
+x_test_tbl <-x_test_tbl[,-5] 
+
+```
+##### Encoding the target variable for Neural Network 
+```{r}
+library(keras)
+# One hot encode train target values
+trainLabels <- to_categorical(y_train)
+
+# One hot encode test target values
+testLabels <- to_categorical(y_test)
+```
+***
+##**Model Building**
+***
+```{r} 
+#library(keras)
+model_keras <- keras_model_sequential()
+model_keras %>% 
+  layer_dense(units = 16,
+    kernel_initializer = "uniform",
+    activation = "relu",
+    input_shape = ncol(x_train_tbl)) %>% 
+  layer_dropout(rate = 0.3) %>% 
+  layer_dense(units = 8,
+    kernel_initializer = "uniform",
+    activation = "relu") %>% 
+  layer_dropout(rate = 0.3) %>% 
+  layer_dense(units = 3,
+    kernel_initializer = "uniform",
+    activation = "softmax") %>% 
+  compile(optimizer = "adam",
+    loss = "categorical_crossentropy",
+    metrics = c("accuracy")
+  )
+```
+
+##### Converting the input data into matrix
+```{r}
+x_train_tbl <-as.matrix(x_train_tbl)
+```
+
+##### Fitting the data
+```{r,message=FALSE,warning=FALSE,results="hide"}
+start_ANN1 <-Sys.time()
+history<-model_keras %>% fit(
+     x_train_tbl, 
+     trainLabels, 
+     epochs = 150, 
+     batch_size = 5, 
+     validation_split = 0.2
+ )
+ANN1_time<-Sys.time() - start_ANN1
+```
+##### Time take by this model
+```{r}
+print(ANN1_time)
+```
+##### Accuracy vs Epochs
+```{r}
+
+plot(history)
+```
+
+##### model seems to overfit because the validation loss is low. Let's try with L1 and L2 regularizations.
+
+
+```{r} 
+#library(keras)
+model_keras2 <- keras_model_sequential()
+model_keras2 %>% 
+  layer_dense(units = 16,
+    kernel_initializer = "uniform",
+    activation = "relu",
+    input_shape = ncol(x_train_tbl),
+    kernel_regularizer=regularizer_l2(0.01)) %>% 
+  layer_dropout(rate = 0.3) %>% 
+  layer_dense(units = 8,
+    kernel_initializer = "uniform",
+    activation = "relu",
+    kernel_regularizer=regularizer_l2(0.01))%>% 
+  layer_dropout(rate = 0.3) %>% 
+  layer_dense(units = 3,
+    kernel_initializer = "uniform",
+    activation = "softmax",
+    kernel_regularizer=regularizer_l2(0.01)) %>% 
+  compile(optimizer = "adam",
+    loss = "categorical_crossentropy",
+    metrics = c("accuracy")
+  )
+```
+
+##### Fitting the data
+```{r,message=FALSE,warning=FALSE,results="hide"}
+start_ANN2 <-Sys.time()
+history2<-model_keras2 %>% fit(
+     x_train_tbl, 
+     trainLabels, 
+     epochs = 150, 
+     batch_size = 5, 
+     validation_split = 0.2
+ )
+ANN2_time<-Sys.time() - start_ANN2
+```
+
+##### Time take by this model
+```{r}
+print(ANN2_time)
+```
+##### Accuracy vs Epochs
+```{r}
+
+plot(history2)
+```
+
+#####Still looks like overfitting, now increasing the regularization parameter
+
+
+
+```{r} 
+#library(keras)
+model_keras3 <- keras_model_sequential()
+model_keras3 %>% 
+  layer_dense(units = 16,
+    kernel_initializer = "uniform",
+    activation = "relu",
+    input_shape = ncol(x_train_tbl),
+    kernel_regularizer=regularizer_l2(0.015)) %>% 
+  layer_dropout(rate = 0.3) %>% 
+  layer_dense(units = 8,
+    kernel_initializer = "uniform",
+    activation = "relu",
+    kernel_regularizer=regularizer_l2(0.015))%>% 
+  layer_dropout(rate = 0.3) %>% 
+  layer_dense(units = 3,
+    kernel_initializer = "uniform",
+    activation = "softmax",
+    kernel_regularizer=regularizer_l2(0.015)) %>% 
+  compile(optimizer = "adam",
+    loss = "categorical_crossentropy",
+    metrics = c("accuracy")
+  )
+```
+
+##### Fitting the data
+```{r,message=FALSE,warning=FALSE,results="hide"}
+start_ANN3 <-Sys.time()
+history3<-model_keras3 %>% fit(
+     x_train_tbl, 
+     trainLabels, 
+     epochs = 150   , 
+     batch_size = 5, 
+     validation_split = 0.2
+ )
+ANN3_time<-Sys.time() - start_ANN3
+```
+
+##### Time take by this model
+```{r}
+print(ANN3_time)
+```
+##### Accuracy vs Epochs
+```{r}
+
+plot(history3)
+```
+##### With our best model with validation, confusion matrix for test data and accuracy
+
+```{r}
+classes <-  model_keras3 %>% predict_classes(as.matrix(x_test_tbl))
+
+# Confusion matrix
+table(y_test, classes)
+#accuracy
+print('ACCURACY: ')
+print(Accuracy(y_test, classes))
+```
+***
+#**Section 4: Random Forest**
+***
+##### The models made above could not learn from the data that well, I think because neural network requires large amount of data to learn from. Random Forest on other hand are bagging of trees which can learn from lesser amount of data.
+
+
+```{r}
+library(caret)
+library(rpart)
+start2 <-Sys.time()
+tunegrid <- expand.grid(.mtry=c(1:5))
+model_rf <- train(Class ~ ., data =training_df, method = "rf",
+                   metric = "Accuracy",
+                  tuneGrid=tunegrid
+                  )
+Sys.time() - start2
+
+```
+
+```{r}
+predict_rf <- predict(model_rf, newdata = test_df)
+confusionMatrix(predict_rf, testing_df$Class)
+
+
+```
+
+##### Variable Importance is as followed.
+
+```{r}
+varImp(model_rf)
+```
+
+
+
+***
+#**Section 5: Model Comparisons**
+***
+
+###Highest Accuracy: random forest could achieve the highest accuracy, of around 76%(test accuracy),compared to the other two models, neural networks did come close to 75% but neural networks require lots of data to become very good.
+
+###Faster Running speeds: The logsitic regression is the fastes to run because it doesn't have many parameters to learn, As compared to neural network which takes the longest to train and random forest is in-between.
