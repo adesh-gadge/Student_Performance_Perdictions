@@ -11,6 +11,7 @@ L|M: Log of odds of having student performance ‘Low’ versus having student p
 M|H: Log of odds of having student performance ‘Medium’ versus having student performance ‘High’ = 9.1711
 <br/>
 ### 2. Artificial Neural Network:
+<br/>
 #### Before regularization:
 ![before regularization](https://github.com/adesh-gadge/Student_Performance_Predictions/blob/master/Before_regularizations.png)
 <br/>
@@ -18,10 +19,12 @@ M|H: Log of odds of having student performance ‘Medium’ versus having studen
 ![after regularization](https://github.com/adesh-gadge/Student_Performance_Predictions/blob/master/after_regulatization.png)
 <br/>
 ### 3. Random Forest Classifier:
+<br/>
 #### Feature importance according to Random Forest
 ![feature importance](https://github.com/adesh-gadge/Student_Performance_Predictions/blob/master/random_forest_importance.PNG) 
 <br/>
 ## Model Comparison:
+<br/>
 **Highest Accuracy:** random forest could achieve the highest accuracy, of around 76%(test accuracy),compared to the other two models, neural networks did come close to 75% but neural networks require lots of data to become very good.
 <br/>
 **Faster Running speeds:** The logsitic regression is the fastest to run because it doesn’t have many parameters to learn, As compared to neural network which takes the longest to train and random forest is in-between.
