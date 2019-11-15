@@ -14,17 +14,17 @@ M|H: Log of odds of having student performance ‘Medium’ versus having studen
 <br/>
 #### Before regularization:
 <br/>
-![before regularization](https://github.com/adesh-gadge/Student_Performance_Predictions/blob/master/Before_regularizations.png)
+![beforeRegularization](https://github.com/adesh-gadge/Student_Performance_Predictions/blob/master/Before_regularizations.png)
 <br/>
 #### After regularization:
 <br/>
-![after regularization](https://github.com/adesh-gadge/Student_Performance_Predictions/blob/master/after_regulatization.png)
+![afterRegularization](https://github.com/adesh-gadge/Student_Performance_Predictions/blob/master/after_regulatization.png)
 <br/>
 ### 3. Random Forest Classifier:
 <br/>
 #### Feature importance according to Random Forest
 <br/>
-![feature importance](https://github.com/adesh-gadge/Student_Performance_Predictions/blob/master/random_forest_importance.PNG) 
+![featureImportance](https://github.com/adesh-gadge/Student_Performance_Predictions/blob/master/random_forest_importance.PNG) 
 <br/>
 ## Model Comparison:
 <br/>
